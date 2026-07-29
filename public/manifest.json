@@ -1,0 +1,16 @@
+{
+  "name": "Scene Inspector",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Inspect character items and metadata in another saved scene without opening it.",
+  "author": "exAsperis",
+  "homepage_url": "https://github.com/exAsperis/OBR-Extension-Test",
+  "icon": "/OBR-Extension-Test/icon.svg",
+  "action": {
+    "title": "Scene Inspector",
+    "icon": "/OBR-Extension-Test/icon.svg",
+    "popover": "/OBR-Extension-Test/",
+    "width": 760,
+    "height": 720
+  }
+}

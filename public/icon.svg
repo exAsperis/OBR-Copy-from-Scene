@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Scene Inspector</title>
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9f6ee8"/>
+      <stop offset="1" stop-color="#5b2c9e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <path d="M12 18a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V18Z" fill="#1b1423" opacity=".9"/>
+  <circle cx="25" cy="27" r="7" fill="#cbb1f1"/>
+  <path d="m16 40 9-9 6 6 5-5 12 8H16Z" fill="#8760bd"/>
+  <circle cx="43" cy="43" r="9" fill="#f6f1ff"/>
+  <circle cx="43" cy="43" r="4" fill="#6f3ead"/>
+  <path d="m49.5 49.5 5 5" stroke="#f6f1ff" stroke-width="4" stroke-linecap="round"/>
+</svg>
