@@ -7,6 +7,7 @@ import {
   getPriorScene,
   isFavorite,
   removeFavorite,
+  refreshFavorite,
   trackActiveScene,
 } from "./sceneHistory";
 
@@ -33,6 +34,9 @@ describe("favorite scenes", () => {
     expect(isFavorite(storage, scene("One", "1"))).toBe(true);
     removeFavorite(storage, scene("One", "1"));
     expect(getFavorites(storage).map((item) => item.name)).toEqual(["Two"]);
+    refreshFavorite(storage, "Two", scene("Two refreshed", "22"));
+    expect(getFavorites(storage)[0]?.name).toBe("Two refreshed");
+    expect(getFavorites(storage)[0]?.items[0]?.id).toBe("22");
   });
 
   it("caps favorites at eight scenes", () => {

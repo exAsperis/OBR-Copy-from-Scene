@@ -1,15 +1,15 @@
-# Owlbear Rodeo Scene Inspector
+# Owlbear Rodeo: Copy from Scene
 
-A minimal read-only extension experiment that uses Owlbear Rodeo's native scene
-picker to inspect character-layer items in a saved scene without opening that
-scene in the room.
+An Owlbear Rodeo extension that uses the native scene picker to inspect and copy
+items from a saved scene without opening that scene in the room.
 
 ## What it tests
 
 The extension calls `OBR.assets.downloadScenes(false)`. The selected
-`SceneDownload` includes the scene's items, which are filtered to the
-`CHARACTER` layer. Each result card shows item metadata, the full returned JSON,
-and a 48px thumbnail when the item is an `IMAGE` with an `image/*` MIME type.
+`SceneDownload` includes the scene's items, which are grouped into collapsible
+layer sections in Z-order. Items can be filtered by name, text, or metadata.
+Each result card includes optional full JSON and a 48px thumbnail when the item
+is an `IMAGE` with an `image/*` MIME type.
 Each row can place a full copy of that item in the center of the current
 viewport, preserving its metadata and image data while assigning a fresh ID.
 While the extension is open, a local-only fixed-pixel crosshair marks that exact
@@ -23,7 +23,8 @@ short message explaining that the extension has no player-facing functions.
 Up to eight scenes can be explicitly saved as persistent favorites and removed
 individually. The extension also assigns a private metadata ID to active scenes
 so it can retain clickable snapshots labeled **Previous active scene** and
-**Active scene**.
+**Active scene**. Layer expansion state is saved in GM player metadata under
+`com.ex-asperis.copy-from-scene`.
 
 The extension also snapshots the active scene's sorted item IDs before and after
 the picker. An unchanged result is strong evidence that the picker did not
@@ -76,7 +77,6 @@ The production app is:
 - Inspection is read-only.
 - Source-scene inspection is read-only; **Place** adds a copy to the current
   scene.
-- Only items on the `CHARACTER` layer are listed.
 - Owlbear Rodeo does not expose a supported way to drag an item from an
   extension iframe onto the scene, so placement uses an explicit button.
 - Non-image characters and image items with non-image MIME types use a

@@ -33,20 +33,29 @@ export function getFavorites(storage: Storage): IndexedScene[] {
   return readJson<IndexedScene[]>(storage, FAVORITE_SCENES_KEY) ?? [];
 }
 
-function sceneSignature(scene: Pick<IndexedScene, "items">): string {
-  return scene.items.map((item) => item.id).sort().join("|");
+function favoriteKey(scene: Pick<IndexedScene, "name">): string {
+  return scene.name.trim().toLocaleLowerCase();
 }
 
 export function isFavorite(storage: Storage, scene: IndexedScene): boolean {
-  const signature = sceneSignature(scene);
+  const key = favoriteKey(scene);
   return getFavorites(storage).some(
-    (favorite) => sceneSignature(favorite) === signature,
+    (favorite) => favoriteKey(favorite) === key,
   );
 }
 
 export function addFavorite(storage: Storage, scene: IndexedScene): IndexedScene[] {
   const favorites = getFavorites(storage);
-  if (isFavorite(storage, scene) || favorites.length >= MAX_FAVORITES) {
+  const existingIndex = favorites.findIndex(
+    (favorite) => favoriteKey(favorite) === favoriteKey(scene),
+  );
+  if (existingIndex >= 0) {
+    const updated = [...favorites];
+    updated[existingIndex] = structuredClone(scene);
+    storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
+    return updated;
+  }
+  if (favorites.length >= MAX_FAVORITES) {
     return favorites;
   }
   const updated = [...favorites, structuredClone(scene)];
@@ -58,10 +67,28 @@ export function removeFavorite(
   storage: Storage,
   scene: IndexedScene,
 ): IndexedScene[] {
-  const signature = sceneSignature(scene);
+  const key = favoriteKey(scene);
   const updated = getFavorites(storage).filter(
-    (favorite) => sceneSignature(favorite) !== signature,
+    (favorite) => favoriteKey(favorite) !== key,
   );
+  storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function refreshFavorite(
+  storage: Storage,
+  favoriteName: string,
+  scene: IndexedScene,
+): IndexedScene[] {
+  const favorites = getFavorites(storage);
+  const index = favorites.findIndex(
+    (favorite) => favoriteKey(favorite) === favoriteKey({ name: favoriteName }),
+  );
+  if (index < 0) {
+    return addFavorite(storage, scene);
+  }
+  const updated = [...favorites];
+  updated[index] = structuredClone(scene);
   storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
   return updated;
 }

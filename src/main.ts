@@ -3,11 +3,11 @@ import OBR, {
   buildImage,
   type Image,
   type Item,
+  type Layer,
   type SceneDownload,
 } from "@owlbear-rodeo/sdk";
 import "./style.css";
 import {
-  getCharacterItems,
   copyItemForPlacement,
   getItemText,
   getThumbnail,
@@ -23,6 +23,7 @@ import {
   isFavorite,
   MAX_FAVORITES,
   removeFavorite,
+  refreshFavorite,
   trackActiveScene,
   type IndexedScene,
 } from "./sceneHistory";
@@ -31,6 +32,41 @@ type Verification = "unchanged" | "changed" | "unavailable" | "cached";
 
 const CROSSHAIR_ID = "com.exasperis.obr-extension-test/placement-crosshair";
 const SCENE_ID_METADATA = "com.exasperis.obr-extension-test/scene-id";
+const PLAYER_METADATA_ID = "com.ex-asperis.copy-from-scene";
+const LAYER_ORDER: Layer[] = [
+  "FOG",
+  "POST_PROCESS",
+  "CONTROL",
+  "POPOVER",
+  "POINTER",
+  "RULER",
+  "TEXT",
+  "NOTE",
+  "ATTACHMENT",
+  "CHARACTER",
+  "MOUNT",
+  "PROP",
+  "DRAWING",
+  "GRID",
+  "MAP",
+];
+const LAYER_LABELS: Record<Layer, string> = {
+  POPOVER: "Popovers",
+  CONTROL: "Controls",
+  POST_PROCESS: "Post-processing",
+  POINTER: "Pointers",
+  FOG: "Fog",
+  RULER: "Rulers",
+  TEXT: "Text",
+  NOTE: "Notes",
+  ATTACHMENT: "Attachments",
+  CHARACTER: "Characters",
+  MOUNT: "Mounts",
+  PROP: "Props",
+  DRAWING: "Drawings",
+  GRID: "Grid",
+  MAP: "Maps",
+};
 const CROSSHAIR_SHADER = `
 uniform vec2 size;
 uniform mat3 view;
@@ -70,15 +106,15 @@ app.innerHTML = `
   <section class="shell">
     <header class="hero">
       <div>
-        <h1>Scene Inspector</h1>
-        <p class="intro">Copy character items from any saved scene to the active scene.</p>
+        <h1>Copy from Scene</h1>
+        <p class="intro">Copy items from any saved scene to the active scene.</p>
       </div>
     </header>
     <nav id="scene-shortcuts" class="scene-shortcuts" aria-label="Indexed scenes"></nav>
     <section id="results" class="results" aria-live="polite">
       <div class="empty">
         <strong>No scene selected</strong>
-        <span>Choose a saved scene to inspect its character layer.</span>
+        <span>Choose a saved scene to inspect its items.</span>
       </div>
     </section>
   </section>
@@ -88,6 +124,7 @@ const results = document.querySelector<HTMLElement>("#results")!;
 const shortcuts = document.querySelector<HTMLElement>("#scene-shortcuts")!;
 let pickButton: HTMLButtonElement | null = null;
 let activeSceneId: string | null = null;
+let sectionState: Partial<Record<Layer, boolean>> = { CHARACTER: true };
 
 function setBusy(busy: boolean): void {
   if (pickButton) {
@@ -179,23 +216,61 @@ async function createPlacementCopy(item: Item, position: { x: number; y: number 
   });
 }
 
+async function loadSectionState(): Promise<void> {
+  const metadata = await OBR.player.getMetadata();
+  const value = metadata[PLAYER_METADATA_ID];
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "sections" in value
+  ) {
+    const sections = (value as { sections?: unknown }).sections;
+    if (sections && typeof sections === "object" && !Array.isArray(sections)) {
+      sectionState = {
+        CHARACTER: true,
+        ...(sections as Partial<Record<Layer, boolean>>),
+      };
+    }
+  }
+}
+
+function persistSectionState(): void {
+  void OBR.player
+    .setMetadata({
+      [PLAYER_METADATA_ID]: { sections: sectionState },
+    })
+    .catch((error: unknown) => {
+      console.warn("Unable to persist section state", error);
+    });
+}
+
 function renderShortcuts(): void {
   shortcuts.replaceChildren();
   const favorites = getFavorites(localStorage);
   const prior = getPriorScene(localStorage);
   const active = getActiveScene(localStorage);
 
-  const addSceneButton = (scene: IndexedScene, removable = false): void => {
+  const addSceneButton = (
+    scene: IndexedScene,
+    options: { removable?: boolean; refreshFavorite?: boolean } = {},
+  ): void => {
     const row = document.createElement("div");
-    row.className = "scene-shortcut-row";
+    row.className = `scene-shortcut-row${options.removable ? " favorite-row" : ""}`;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "scene-shortcut";
     button.textContent = scene.name;
-    button.addEventListener("click", () => renderScene(scene, "cached"));
+    button.addEventListener("click", () => {
+      if (options.refreshFavorite) {
+        void inspectScene(scene.name, scene.name);
+      } else {
+        renderScene(scene, "cached");
+      }
+    });
     row.append(button);
 
-    if (removable) {
+    if (options.removable) {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "remove-favorite";
@@ -211,10 +286,14 @@ function renderShortcuts(): void {
   };
 
   for (const scene of favorites) {
-    addSceneButton(scene, true);
+    addSceneButton(scene, { removable: true, refreshFavorite: true });
   }
-  if (prior) {
-    addSceneButton(prior);
+  addSceneButton(
+    prior ?? { name: "Previous active scene", items: [] },
+  );
+  const previousButton = shortcuts.lastElementChild?.querySelector("button");
+  if (!prior && previousButton instanceof HTMLButtonElement) {
+    previousButton.disabled = true;
   }
   if (active) {
     addSceneButton(active);
@@ -224,7 +303,7 @@ function renderShortcuts(): void {
   pickButton.type = "button";
   pickButton.className = "scene-shortcut scene-shortcut-pick";
   pickButton.textContent = "Pick another scene";
-  pickButton.addEventListener("click", inspectScene);
+  pickButton.addEventListener("click", () => void inspectScene());
   shortcuts.append(pickButton);
 }
 
@@ -278,6 +357,13 @@ function createThumbnail(item: Item): HTMLElement {
 function createItemCard(item: Item): HTMLElement {
   const card = document.createElement("article");
   card.className = "card";
+  card.dataset.itemSearch = [
+    item.name,
+    getItemText(item),
+    JSON.stringify(item.metadata),
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
   card.append(createThumbnail(item));
 
   const body = document.createElement("div");
@@ -285,11 +371,16 @@ function createItemCard(item: Item): HTMLElement {
 
   const title = document.createElement("strong");
   title.className = "item-text";
-  title.textContent = getItemText(item);
+  title.textContent = item.name || "Unnamed item";
   const name = document.createElement("span");
   name.className = "item-name";
-  name.textContent = item.name || "Unnamed item";
-  body.append(title, name);
+  name.textContent = getItemText(item);
+  const metadataToggle = document.createElement("button");
+  metadataToggle.type = "button";
+  metadataToggle.className = "metadata-toggle";
+  metadataToggle.textContent = "Metadata (JSON)";
+  metadataToggle.setAttribute("aria-expanded", "false");
+  body.append(title, name, metadataToggle);
 
   const placeButton = document.createElement("button");
   placeButton.className = "place-button";
@@ -328,11 +419,20 @@ function createItemCard(item: Item): HTMLElement {
 
   card.append(body);
   card.append(placeButton);
+
+  const json = document.createElement("pre");
+  json.className = "item-json";
+  json.hidden = true;
+  json.textContent = JSON.stringify(item, null, 2);
+  metadataToggle.addEventListener("click", () => {
+    json.hidden = !json.hidden;
+    metadataToggle.setAttribute("aria-expanded", String(!json.hidden));
+  });
+  card.append(json);
   return card;
 }
 
 function renderScene(scene: IndexedScene, verification: Verification): void {
-  const characters = getCharacterItems(scene);
   results.replaceChildren();
 
   const summary = document.createElement("header");
@@ -357,52 +457,105 @@ function renderScene(scene: IndexedScene, verification: Verification): void {
   }
   const count = document.createElement("span");
   count.className = "count";
-  count.textContent = `${characters.length} character${characters.length === 1 ? "" : "s"}`;
+  count.textContent = `${scene.items.length} item${scene.items.length === 1 ? "" : "s"}`;
   summary.append(headingGroup, count);
   results.append(summary);
 
-  if (verification === "cached") {
-    setStatus(`Loaded indexed scene “${scene.name}”.`, "neutral");
-  } else if (verification === "unchanged") {
-    setStatus(
-      "Active scene unchanged — it remained ready with the same item IDs before and after inspection.",
-      "success",
-    );
-  } else if (verification === "changed") {
-    setStatus(
-      "The active scene item set changed while the picker was open. This may be a scene switch or a concurrent room edit.",
-      "warning",
-    );
-  } else {
-    setStatus(
-      "Selected scene loaded, but the active scene was not ready for a before-and-after comparison.",
-      "warning",
-    );
-  }
+  const filter = document.createElement("input");
+  filter.className = "item-filter";
+  filter.type = "search";
+  filter.placeholder = "Filter items";
+  filter.setAttribute("aria-label", "Filter items by name, text, or metadata");
+  results.append(filter);
 
-  if (characters.length === 0) {
+  if (scene.items.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.innerHTML = `<strong>No character items</strong><span>This scene has no items on the CHARACTER layer.</span>`;
+    empty.innerHTML = `<strong>No items</strong><span>This scene snapshot contains no items.</span>`;
     results.append(empty);
     return;
   }
 
-  const grid = document.createElement("div");
-  grid.className = "item-list";
-  for (const item of characters) {
-    grid.append(createItemCard(item));
+  const sections = document.createElement("div");
+  sections.className = "layer-sections";
+  const populatedLayers = new Map<Layer, Item[]>();
+  for (const item of scene.items) {
+    const items = populatedLayers.get(item.layer) ?? [];
+    items.push(item);
+    populatedLayers.set(item.layer, items);
   }
-  results.append(grid);
+
+  for (const layer of LAYER_ORDER) {
+    const items = populatedLayers.get(layer);
+    if (!items?.length) {
+      continue;
+    }
+    items.sort((a, b) => {
+      const nameOrder = (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      });
+      return (
+        nameOrder ||
+        getItemText(a).localeCompare(getItemText(b), undefined, {
+          sensitivity: "base",
+        })
+      );
+    });
+
+    const details = document.createElement("details");
+    details.className = "layer-section";
+    details.open = sectionState[layer] ?? layer === "CHARACTER";
+    details.dataset.layer = layer;
+    const sectionSummary = document.createElement("summary");
+    const label = document.createElement("span");
+    label.textContent = LAYER_LABELS[layer];
+    const layerCount = document.createElement("span");
+    layerCount.className = "layer-count";
+    layerCount.textContent = String(items.length);
+    sectionSummary.append(label, layerCount);
+    details.append(sectionSummary);
+
+    const list = document.createElement("div");
+    list.className = "item-list";
+    for (const item of items) {
+      list.append(createItemCard(item));
+    }
+    details.append(list);
+    details.addEventListener("toggle", () => {
+      sectionState[layer] = details.open;
+      persistSectionState();
+    });
+    sections.append(details);
+  }
+  results.append(sections);
+
+  filter.addEventListener("input", () => {
+    const query = filter.value.trim().toLocaleLowerCase();
+    for (const card of sections.querySelectorAll<HTMLElement>("[data-item-search]")) {
+      card.hidden = Boolean(query) && !card.dataset.itemSearch?.includes(query);
+    }
+    for (const section of sections.querySelectorAll<HTMLDetailsElement>(".layer-section")) {
+      const visibleItems = [...section.querySelectorAll<HTMLElement>("[data-item-search]")]
+        .filter((card) => !card.hidden).length;
+      section.hidden = visibleItems === 0;
+      const layerCount = section.querySelector<HTMLElement>(".layer-count");
+      if (layerCount) {
+        layerCount.textContent = String(visibleItems);
+      }
+    }
+  });
 }
 
-async function inspectScene(): Promise<void> {
+async function inspectScene(
+  defaultSearch?: string,
+  favoriteToRefresh?: string,
+): Promise<void> {
   setBusy(true);
   setStatus("Waiting for a scene selection…", "neutral");
 
   try {
     const before = await takeCurrentSceneSnapshot();
-    const scenes = await OBR.assets.downloadScenes(false);
+    const scenes = await OBR.assets.downloadScenes(false, defaultSearch);
 
     if (scenes.length === 0) {
       setStatus("Scene selection cancelled. Nothing changed.", "neutral");
@@ -418,6 +571,10 @@ async function inspectScene(): Promise<void> {
       name: scene.name,
       items: scene.items,
     };
+    if (favoriteToRefresh) {
+      refreshFavorite(localStorage, favoriteToRefresh, indexedScene);
+      renderShortcuts();
+    }
     const after = await takeCurrentSceneSnapshot();
     const verification: Verification =
       before.ready && after.ready
@@ -443,7 +600,7 @@ OBR.onReady(() => {
     if (role !== "GM") {
       app.innerHTML = `
         <section class="shell player-message">
-          <p class="eyebrow">Scene Inspector</p>
+          <p class="eyebrow">Copy from Scene</p>
           <h1>GM-only extension</h1>
           <p class="intro">There are no player-facing functions in this extension.</p>
         </section>
@@ -453,6 +610,7 @@ OBR.onReady(() => {
 
     setBusy(false);
     setStatus("Connected. Pick a saved scene to begin.", "neutral");
+    await loadSectionState();
     await syncActiveSceneHistory();
 
     if (await OBR.action.isOpen()) {

@@ -11,6 +11,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   min-width: 280px;
   margin: 0;
@@ -78,8 +82,12 @@ h1 {
 
 .scene-shortcut-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
+}
+
+.scene-shortcut-row.favorite-row {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .scene-shortcut {
@@ -131,8 +139,11 @@ h1 {
 }
 
 .scene-shortcut:disabled {
-  cursor: wait;
-  opacity: 0.6;
+  border-color: #4e4752;
+  color: #867d8c;
+  background: #302b34;
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 /* Retained for compatibility with older cached markup. */
@@ -225,9 +236,68 @@ h1 {
   white-space: nowrap;
 }
 
+.item-filter {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #51475e;
+  border-radius: 8px;
+  outline: none;
+  color: #f6f1ff;
+  background: #211b28;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.item-filter:focus {
+  border-color: #9c68e8;
+  box-shadow: 0 0 0 2px rgb(156 104 232 / 18%);
+}
+
+.layer-sections {
+  display: grid;
+  gap: 6px;
+}
+
+.layer-section {
+  overflow: hidden;
+  border: 1px solid #3f3549;
+  border-radius: 8px;
+  background: #1d1723;
+}
+
+.layer-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  color: #d9cfdf;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.layer-section[open] > summary {
+  border-bottom: 1px solid #3f3549;
+}
+
+.layer-count {
+  min-width: 21px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #bfa7e8;
+  background: #30253b;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
 .item-list {
   display: grid;
   gap: 7px;
+  padding: 7px;
 }
 
 .card {
@@ -286,6 +356,36 @@ h1 {
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.metadata-toggle {
+  width: max-content;
+  padding: 0;
+  border: 0;
+  color: #bfa7e8;
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.metadata-toggle:hover {
+  color: #e1d2f6;
+}
+
+.item-json {
+  grid-column: 1 / -1;
+  max-height: 320px;
+  margin: 0;
+  padding: 9px;
+  overflow: auto;
+  border-radius: 7px;
+  color: #d9cfdf;
+  background: #15111a;
+  font: 0.7rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .place-button {
