@@ -77,17 +77,20 @@ half4 main(float2 coord) {
 
   float horizontalArm =
     (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.y)) *
-    smoothstep(9.0, 10.0, distanceFromCenter.x) *
+    smoothstep(31.0, 32.0, distanceFromCenter.x) *
     (1.0 - smoothstep(79.0, 80.0, distanceFromCenter.x));
   float verticalArm =
     (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.x)) *
-    smoothstep(9.0, 10.0, distanceFromCenter.y) *
+    smoothstep(31.0, 32.0, distanceFromCenter.y) *
     (1.0 - smoothstep(79.0, 80.0, distanceFromCenter.y));
 
   float squareDistance = max(distanceFromCenter.x, distanceFromCenter.y);
+  float squareOutline =
+    (1.0 - smoothstep(31.0, 32.0, squareDistance)) *
+    smoothstep(23.0, 24.0, squareDistance);
   float centerDot = 1.0 - smoothstep(2.5, 3.5, squareDistance);
 
-  float alpha = max(centerDot, max(horizontalArm, verticalArm));
+  float alpha = max(centerDot, max(squareOutline, max(horizontalArm, verticalArm)));
   float finalAlpha = alpha * 0.95;
   vec3 color = vec3(0.80, 0.63, 0.96);
   return half4(color * finalAlpha, finalAlpha);
