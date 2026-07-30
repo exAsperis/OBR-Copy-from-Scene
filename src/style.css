@@ -80,28 +80,26 @@ h1 {
   width: 100%;
   padding: 9px 11px;
   overflow: hidden;
-  border: 1px solid #51475e;
+  border: 1px solid #8051bd;
   border-radius: 8px;
-  color: #ddd4e5;
-  background: #241e2c;
+  color: #f6f1ff;
+  background: #56307d;
   font: inherit;
   font-size: 0.84rem;
-  text-align: left;
+  font-weight: 700;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .scene-shortcut:hover:not(:disabled) {
-  border-color: #8051bd;
-  background: #30253b;
+  background: #684093;
 }
 
 .scene-shortcut-pick {
   color: white;
   background: #7440bc;
-  font-weight: 700;
-  text-align: center;
 }
 
 .scene-shortcut-pick:hover:not(:disabled) {
@@ -133,38 +131,6 @@ h1 {
 #pick-scene:disabled {
   cursor: wait;
   opacity: 0.6;
-}
-
-.status {
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  font-size: 0.88rem;
-  line-height: 1.4;
-}
-
-.status-neutral {
-  border-color: #51475e;
-  color: #d1c9d8;
-  background: #241e2c;
-}
-
-.status-success {
-  border-color: #39775d;
-  color: #baf2d4;
-  background: #183328;
-}
-
-.status-warning {
-  border-color: #826d36;
-  color: #f3dda4;
-  background: #382f19;
-}
-
-.status-error {
-  border-color: #8d444e;
-  color: #ffc2ca;
-  background: #3b1d22;
 }
 
 .results {

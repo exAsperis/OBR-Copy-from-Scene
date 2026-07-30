@@ -32,13 +32,26 @@ export function getRecentScenes(storage: Storage): IndexedScene[] {
   return readJson<IndexedScene[]>(storage, RECENT_SCENES_KEY) ?? [];
 }
 
+function sceneSignature(scene: Pick<IndexedScene, "items">): string {
+  return scene.items.map((item) => item.id).sort().join("|");
+}
+
+export function findIndexedSceneName(
+  storage: Storage,
+  items: Item[],
+): string | null {
+  const signature = sceneSignature({ items });
+  return (
+    getRecentScenes(storage).find(
+      (scene) => sceneSignature(scene) === signature,
+    )?.name ?? null
+  );
+}
+
 export function rememberScene(storage: Storage, scene: IndexedScene): IndexedScene[] {
-  const signature = scene.items.map((item) => item.id).sort().join("|");
+  const signature = sceneSignature(scene);
   const recent = getRecentScenes(storage).filter((candidate) => {
-    const candidateSignature = candidate.items
-      .map((item) => item.id)
-      .sort()
-      .join("|");
+    const candidateSignature = sceneSignature(candidate);
     return candidate.name !== scene.name || candidateSignature !== signature;
   });
   const updated = [structuredClone(scene), ...recent].slice(0, 3);
@@ -47,7 +60,17 @@ export function rememberScene(storage: Storage, scene: IndexedScene): IndexedSce
 }
 
 export function getPriorScene(storage: Storage): IndexedScene | null {
-  return readJson<IndexedScene>(storage, PRIOR_SCENE_KEY);
+  const prior = readJson<IndexedScene>(storage, PRIOR_SCENE_KEY);
+  if (!prior || prior.name !== "Prior active scene") {
+    return prior;
+  }
+
+  return {
+    ...prior,
+    name:
+      findIndexedSceneName(storage, prior.items) ??
+      "Previous scene (name unavailable)",
+  };
 }
 
 export function trackActiveScene(
@@ -56,8 +79,7 @@ export function trackActiveScene(
 ): IndexedScene | null {
   const previous = readJson<ActiveSceneSnapshot>(storage, ACTIVE_SCENE_KEY);
   if (previous && previous.id !== snapshot.id) {
-    const prior = { ...previous.scene, name: "Prior active scene" };
-    storage.setItem(PRIOR_SCENE_KEY, JSON.stringify(prior));
+    storage.setItem(PRIOR_SCENE_KEY, JSON.stringify(previous.scene));
   }
   storage.setItem(ACTIVE_SCENE_KEY, JSON.stringify(snapshot));
   return getPriorScene(storage);

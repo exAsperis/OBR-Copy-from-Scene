@@ -3,6 +3,7 @@ import type { Item } from "@owlbear-rodeo/sdk";
 import {
   getPriorScene,
   getRecentScenes,
+  findIndexedSceneName,
   rememberScene,
   trackActiveScene,
 } from "./sceneHistory";
@@ -33,16 +34,17 @@ describe("recent scene history", () => {
       "Three",
       "Two",
     ]);
+    expect(findIndexedSceneName(storage, [{ id: "3" } as Item])).toBe("Three");
   });
 });
 
 describe("active scene tracking", () => {
   it("promotes the previous snapshot when the active scene ID changes", () => {
     const storage = new MemoryStorage();
-    trackActiveScene(storage, { id: "a", scene: scene("Active scene", "1") });
+    trackActiveScene(storage, { id: "a", scene: scene("Market Square", "1") });
     expect(getPriorScene(storage)).toBeNull();
     trackActiveScene(storage, { id: "b", scene: scene("Active scene", "2") });
-    expect(getPriorScene(storage)?.name).toBe("Prior active scene");
+    expect(getPriorScene(storage)?.name).toBe("Market Square");
     expect(getPriorScene(storage)?.items[0]?.id).toBe("1");
   });
 });

@@ -18,6 +18,7 @@ import {
 import {
   getPriorScene,
   getRecentScenes,
+  findIndexedSceneName,
   rememberScene,
   trackActiveScene,
   type IndexedScene,
@@ -27,6 +28,7 @@ type Verification = "unchanged" | "changed" | "unavailable" | "cached";
 
 const CROSSHAIR_ID = "com.exasperis.obr-extension-test/placement-crosshair";
 const SCENE_ID_METADATA = "com.exasperis.obr-extension-test/scene-id";
+const SCENE_NAME_METADATA = "com.exasperis.obr-extension-test/scene-name";
 const CROSSHAIR_SHADER = `
 uniform vec2 size;
 uniform mat3 view;
@@ -71,9 +73,6 @@ app.innerHTML = `
       </div>
     </header>
     <nav id="scene-shortcuts" class="scene-shortcuts" aria-label="Indexed scenes"></nav>
-    <div id="status" class="status status-neutral" role="status">
-      Waiting for the Owlbear Rodeo SDK.
-    </div>
     <section id="results" class="results" aria-live="polite">
       <div class="empty">
         <strong>No scene selected</strong>
@@ -83,11 +82,11 @@ app.innerHTML = `
   </section>
 `;
 
-const status = document.querySelector<HTMLElement>("#status")!;
 const results = document.querySelector<HTMLElement>("#results")!;
 const shortcuts = document.querySelector<HTMLElement>("#scene-shortcuts")!;
 let pickButton: HTMLButtonElement | null = null;
 let activeSceneId: string | null = null;
+let activeSceneName = "Previous scene (name unavailable)";
 
 function setBusy(busy: boolean): void {
   if (pickButton) {
@@ -97,8 +96,9 @@ function setBusy(busy: boolean): void {
 }
 
 function setStatus(message: string, kind: "neutral" | "success" | "warning" | "error"): void {
-  status.className = `status status-${kind}`;
-  status.textContent = message;
+  if (kind === "error") {
+    console.error(message);
+  }
 }
 
 async function takeCurrentSceneSnapshot(): Promise<SceneSnapshot> {
@@ -222,9 +222,18 @@ async function syncActiveSceneHistory(): Promise<void> {
   }
 
   const items = await OBR.scene.items.getItems();
+  const storedName = metadata[SCENE_NAME_METADATA];
+  const indexedName = findIndexedSceneName(localStorage, items);
+  activeSceneName =
+    typeof storedName === "string"
+      ? storedName
+      : indexedName ?? "Previous scene (name unavailable)";
+  if (typeof storedName !== "string" && indexedName) {
+    await OBR.scene.setMetadata({ [SCENE_NAME_METADATA]: indexedName });
+  }
   trackActiveScene(localStorage, {
     id: activeSceneId,
-    scene: { name: "Active scene", items },
+    scene: { name: activeSceneName, items },
   });
   renderShortcuts();
 }
@@ -449,6 +458,7 @@ OBR.onReady(() => {
         );
       } else {
         activeSceneId = null;
+        activeSceneName = "Previous scene (name unavailable)";
       }
     });
 
@@ -458,7 +468,7 @@ OBR.onReady(() => {
       }
       trackActiveScene(localStorage, {
         id: activeSceneId,
-        scene: { name: "Active scene", items },
+        scene: { name: activeSceneName, items },
       });
     });
   })().catch((error: unknown) => {
