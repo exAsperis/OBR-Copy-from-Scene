@@ -12,6 +12,9 @@ The extension calls `OBR.assets.downloadScenes(false)`. The selected
 and a 48px thumbnail when the item is an `IMAGE` with an `image/*` MIME type.
 Each row can place a full copy of that item in the center of the current
 viewport, preserving its metadata and image data while assigning a fresh ID.
+While the extension is open, a local-only fixed-pixel crosshair marks that exact
+placement point. It uses a viewport effect, so it remains centered and the same
+size while the map pans or zooms.
 
 The extension also snapshots the active scene's sorted item IDs before and after
 the picker. An unchanged result is strong evidence that the picker did not

@@ -1,4 +1,8 @@
-import OBR, { type Item, type SceneDownload } from "@owlbear-rodeo/sdk";
+import OBR, {
+  buildEffect,
+  type Item,
+  type SceneDownload,
+} from "@owlbear-rodeo/sdk";
 import "./style.css";
 import {
   getCharacterItems,
@@ -11,6 +15,34 @@ import {
 } from "./inspector";
 
 type Verification = "unchanged" | "changed" | "unavailable";
+
+const CROSSHAIR_ID = "com.exasperis.obr-extension-test/placement-crosshair";
+const CROSSHAIR_SHADER = `
+uniform vec2 size;
+uniform mat3 view;
+
+half4 main(float2 coord) {
+  vec2 screen = (vec3(coord, 1.0) * view).xy;
+  vec2 distanceFromCenter = abs(screen - size * 0.5);
+
+  float horizontalArm =
+    (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.y)) *
+    smoothstep(7.0, 8.0, distanceFromCenter.x) *
+    (1.0 - smoothstep(19.0, 20.0, distanceFromCenter.x));
+  float verticalArm =
+    (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.x)) *
+    smoothstep(7.0, 8.0, distanceFromCenter.y) *
+    (1.0 - smoothstep(19.0, 20.0, distanceFromCenter.y));
+
+  float squareDistance = max(distanceFromCenter.x, distanceFromCenter.y);
+  float squareOutline =
+    (1.0 - smoothstep(7.0, 8.0, squareDistance)) *
+    smoothstep(5.0, 6.0, squareDistance);
+
+  float alpha = max(squareOutline, max(horizontalArm, verticalArm));
+  return half4(0.80, 0.63, 0.96, alpha * 0.95);
+}
+`;
 
 const app = document.querySelector<HTMLElement>("#app");
 
@@ -65,6 +97,32 @@ async function takeCurrentSceneSnapshot(): Promise<SceneSnapshot> {
 
   const items = await OBR.scene.items.getItems();
   return { ready: true, itemIds: stableItemIds(items) };
+}
+
+async function removePlacementCrosshair(): Promise<void> {
+  if (await OBR.scene.isReady()) {
+    await OBR.scene.local.deleteItems([CROSSHAIR_ID]);
+  }
+}
+
+async function showPlacementCrosshair(): Promise<void> {
+  if (!(await OBR.scene.isReady())) {
+    return;
+  }
+
+  await OBR.scene.local.deleteItems([CROSSHAIR_ID]);
+  const crosshair = buildEffect()
+    .id(CROSSHAIR_ID)
+    .name("Placement crosshair")
+    .effectType("VIEWPORT")
+    .sksl(CROSSHAIR_SHADER)
+    .blendMode("SRC_OVER")
+    .layer("CONTROL")
+    .locked(true)
+    .disableHit(true)
+    .zIndex(1_000_000)
+    .build();
+  await OBR.scene.local.addItems([crosshair]);
 }
 
 function createThumbnail(item: Item): HTMLElement {
@@ -234,4 +292,17 @@ pickButton.addEventListener("click", inspectScene);
 OBR.onReady(() => {
   setBusy(false);
   setStatus("Connected. Pick a saved scene to begin.", "neutral");
+  void showPlacementCrosshair().catch((error: unknown) => {
+    console.warn("Unable to display placement crosshair", error);
+  });
+
+  OBR.scene.onReadyChange((ready) => {
+    if (ready) {
+      void showPlacementCrosshair();
+    }
+  });
+});
+
+window.addEventListener("beforeunload", () => {
+  void removePlacementCrosshair();
 });
