@@ -1,4 +1,11 @@
-import type { Image, Item, SceneDownload } from "@owlbear-rodeo/sdk";
+import type {
+  Descendant,
+  Image,
+  Item,
+  SceneDownload,
+  TextContent,
+  Vector2,
+} from "@owlbear-rodeo/sdk";
 
 export interface SceneSnapshot {
   ready: boolean;
@@ -35,4 +42,43 @@ export function snapshotsMatch(before: SceneSnapshot, after: SceneSnapshot): boo
 
 export function stableItemIds(items: Item[]): string[] {
   return items.map((item) => item.id).sort();
+}
+
+function flattenRichText(nodes: Descendant[]): string {
+  return nodes
+    .map((node) => {
+      if ("text" in node) {
+        return node.text;
+      }
+      return flattenRichText(node.children);
+    })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function getItemText(item: Item): string {
+  if (!("text" in item)) {
+    return "Untitled";
+  }
+
+  const text = item.text as TextContent;
+  const value =
+    text.type === "PLAIN" ? text.plainText.trim() : flattenRichText(text.richText);
+  return value || "Untitled";
+}
+
+export function copyItemForPlacement(
+  item: Item,
+  position: Vector2,
+  id: string = crypto.randomUUID(),
+): Item {
+  const copy = structuredClone(item) as {
+    -readonly [Key in keyof Item]: Item[Key];
+  };
+  copy.id = id;
+  copy.position = position;
+  copy.attachedTo = undefined;
+  copy.disableAutoZIndex = false;
+  return copy as Item;
 }

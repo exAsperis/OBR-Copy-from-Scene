@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Image, Item, SceneDownload } from "@owlbear-rodeo/sdk";
 import {
   getCharacterItems,
+  copyItemForPlacement,
+  getItemText,
   getThumbnail,
   snapshotsMatch,
   stableItemIds,
@@ -98,6 +100,35 @@ describe("getThumbnail", () => {
   it("rejects video image items and non-image character items", () => {
     expect(getThumbnail(imageItem("video/webm"))).toBeNull();
     expect(getThumbnail(item({ layer: "CHARACTER" }))).toBeNull();
+  });
+});
+
+describe("getItemText", () => {
+  it("uses image text as the primary display identifier", () => {
+    const character = imageItem();
+    character.text.plainText = "Goblin 3";
+    expect(getItemText(character)).toBe("Goblin 3");
+  });
+
+  it("falls back when an item has no text", () => {
+    expect(getItemText(item({ layer: "CHARACTER" }))).toBe("Untitled");
+  });
+});
+
+describe("copyItemForPlacement", () => {
+  it("preserves item data while assigning a new ID and position", () => {
+    const source = imageItem();
+    source.metadata = { "example.test/data": { hp: 7 } };
+    source.attachedTo = "old-parent";
+
+    const copy = copyItemForPlacement(source, { x: 40, y: 60 }, "new-id");
+
+    expect(copy.id).toBe("new-id");
+    expect(copy.position).toEqual({ x: 40, y: 60 });
+    expect(copy.metadata).toEqual(source.metadata);
+    expect((copy as Image).image).toEqual(source.image);
+    expect(copy.attachedTo).toBeUndefined();
+    expect(source.id).toBe("image-1");
   });
 });
 

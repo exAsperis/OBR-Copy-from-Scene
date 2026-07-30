@@ -2,6 +2,8 @@ import OBR, { type Item, type SceneDownload } from "@owlbear-rodeo/sdk";
 import "./style.css";
 import {
   getCharacterItems,
+  copyItemForPlacement,
+  getItemText,
   getThumbnail,
   snapshotsMatch,
   stableItemIds,
@@ -65,33 +67,6 @@ async function takeCurrentSceneSnapshot(): Promise<SceneSnapshot> {
   return { ready: true, itemIds: stableItemIds(items) };
 }
 
-function createMetadata(metadata: Item["metadata"]): HTMLElement {
-  const container = document.createElement("div");
-  container.className = "metadata";
-
-  const entries = Object.entries(metadata);
-  if (entries.length === 0) {
-    container.innerHTML = `<span class="muted">No metadata</span>`;
-    return container;
-  }
-
-  for (const [key, value] of entries) {
-    const row = document.createElement("div");
-    row.className = "metadata-row";
-
-    const keyElement = document.createElement("code");
-    keyElement.textContent = key;
-
-    const valueElement = document.createElement("pre");
-    valueElement.textContent = JSON.stringify(value, null, 2);
-
-    row.append(keyElement, valueElement);
-    container.append(row);
-  }
-
-  return container;
-}
-
 function createThumbnail(item: Item): HTMLElement {
   const frame = document.createElement("div");
   frame.className = "thumbnail";
@@ -125,43 +100,51 @@ function createItemCard(item: Item): HTMLElement {
   const body = document.createElement("div");
   body.className = "card-body";
 
-  const heading = document.createElement("div");
-  heading.className = "card-heading";
-  const title = document.createElement("h3");
-  title.textContent = item.name || "Unnamed character";
-  const badge = document.createElement("span");
-  badge.className = "type-badge";
-  badge.textContent = item.type;
-  heading.append(title, badge);
+  const title = document.createElement("strong");
+  title.className = "item-text";
+  title.textContent = getItemText(item);
+  const name = document.createElement("span");
+  name.className = "item-name";
+  name.textContent = item.name || "Unnamed item";
+  body.append(title, name);
 
-  const facts = document.createElement("dl");
-  facts.className = "facts";
-  const factValues: Array<[string, string]> = [
-    ["ID", item.id],
-    ["Visible", item.visible ? "Yes" : "No"],
-    ["Locked", item.locked ? "Yes" : "No"],
-  ];
-  for (const [label, value] of factValues) {
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const description = document.createElement("dd");
-    description.textContent = value;
-    facts.append(term, description);
-  }
+  const placeButton = document.createElement("button");
+  placeButton.className = "place-button";
+  placeButton.type = "button";
+  placeButton.textContent = "Place";
+  placeButton.addEventListener("click", async () => {
+    placeButton.disabled = true;
+    placeButton.textContent = "Placing…";
+    try {
+      if (!(await OBR.scene.isReady())) {
+        throw new Error("Open a scene before placing an item.");
+      }
+      const [width, height] = await Promise.all([
+        OBR.viewport.getWidth(),
+        OBR.viewport.getHeight(),
+      ]);
+      const position = await OBR.viewport.inverseTransformPoint({
+        x: width / 2,
+        y: height / 2,
+      });
+      const copy = copyItemForPlacement(item, position);
+      await OBR.scene.items.addItems([copy]);
+      setStatus(`Placed “${getItemText(item)}” in the center of the current view.`, "success");
+      placeButton.textContent = "Placed";
+      window.setTimeout(() => {
+        placeButton.disabled = false;
+        placeButton.textContent = "Place";
+      }, 900);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`Unable to place item: ${message}`, "error");
+      placeButton.disabled = false;
+      placeButton.textContent = "Place";
+    }
+  });
 
-  const metadataTitle = document.createElement("h4");
-  metadataTitle.textContent = "Metadata";
-
-  const details = document.createElement("details");
-  const summary = document.createElement("summary");
-  summary.textContent = "Complete item JSON";
-  const json = document.createElement("pre");
-  json.className = "raw-json";
-  json.textContent = JSON.stringify(item, null, 2);
-  details.append(summary, json);
-
-  body.append(heading, facts, metadataTitle, createMetadata(item.metadata), details);
   card.append(body);
+  card.append(placeButton);
   return card;
 }
 
@@ -205,7 +188,7 @@ function renderScene(scene: SceneDownload, verification: Verification): void {
   }
 
   const grid = document.createElement("div");
-  grid.className = "card-grid";
+  grid.className = "item-list";
   for (const item of characters) {
     grid.append(createItemCard(item));
   }

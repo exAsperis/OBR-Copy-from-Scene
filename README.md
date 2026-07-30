@@ -9,7 +9,9 @@ scene in the room.
 The extension calls `OBR.assets.downloadScenes(false)`. The selected
 `SceneDownload` includes the scene's items, which are filtered to the
 `CHARACTER` layer. Each result card shows item metadata, the full returned JSON,
-and a thumbnail when the item is an `IMAGE` with an `image/*` MIME type.
+and a 48px thumbnail when the item is an `IMAGE` with an `image/*` MIME type.
+Each row can place a full copy of that item in the center of the current
+viewport, preserving its metadata and image data while assigning a fresh ID.
 
 The extension also snapshots the active scene's sorted item IDs before and after
 the picker. An unchanged result is strong evidence that the picker did not
@@ -60,7 +62,11 @@ The production app is:
 
 - The picker shares one scene at a time.
 - Inspection is read-only.
+- Source-scene inspection is read-only; **Place** adds a copy to the current
+  scene.
 - Only items on the `CHARACTER` layer are listed.
+- Owlbear Rodeo does not expose a supported way to drag an item from an
+  extension iframe onto the scene, so placement uses an explicit button.
 - Non-image characters and image items with non-image MIME types use a
   placeholder.
 - Broken or inaccessible image URLs fall back to an “Image unavailable”
