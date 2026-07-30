@@ -29,6 +29,12 @@ button {
   padding: 18px;
 }
 
+.player-message {
+  min-height: 180px;
+  align-content: center;
+  text-align: center;
+}
+
 .hero {
   display: flex;
   align-items: flex-start;

@@ -14,7 +14,11 @@ Each row can place a full copy of that item in the center of the current
 viewport, preserving its metadata and image data while assigning a fresh ID.
 While the extension is open, a local-only fixed-pixel crosshair marks that exact
 placement point. It uses a viewport effect, so it remains centered and the same
-size while the map pans or zooms.
+size while the map pans or zooms. Closing the extension panel removes it.
+
+The scene picker and placement controls are available only to GMs. Owlbear
+Rodeo's manifest format cannot hide an action by player role, so players see a
+short message explaining that the extension has no player-facing functions.
 
 The extension also snapshots the active scene's sorted item IDs before and after
 the picker. An unchanged result is strong evidence that the picker did not

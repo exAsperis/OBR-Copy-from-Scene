@@ -40,7 +40,9 @@ half4 main(float2 coord) {
     smoothstep(5.0, 6.0, squareDistance);
 
   float alpha = max(squareOutline, max(horizontalArm, verticalArm));
-  return half4(0.80, 0.63, 0.96, alpha * 0.95);
+  float finalAlpha = alpha * 0.95;
+  vec3 color = vec3(0.80, 0.63, 0.96);
+  return half4(color * finalAlpha, finalAlpha);
 }
 `;
 
@@ -290,16 +292,50 @@ async function inspectScene(): Promise<void> {
 pickButton.addEventListener("click", inspectScene);
 
 OBR.onReady(() => {
-  setBusy(false);
-  setStatus("Connected. Pick a saved scene to begin.", "neutral");
-  void showPlacementCrosshair().catch((error: unknown) => {
-    console.warn("Unable to display placement crosshair", error);
-  });
+  void (async () => {
+    await OBR.action.setWidth(380);
+    await removePlacementCrosshair();
 
-  OBR.scene.onReadyChange((ready) => {
-    if (ready) {
-      void showPlacementCrosshair();
+    const role = await OBR.player.getRole();
+    if (role !== "GM") {
+      app.innerHTML = `
+        <section class="shell player-message">
+          <p class="eyebrow">Scene Inspector</p>
+          <h1>GM-only extension</h1>
+          <p class="intro">There are no player-facing functions in this extension.</p>
+        </section>
+      `;
+      return;
     }
+
+    setBusy(false);
+    setStatus("Connected. Pick a saved scene to begin.", "neutral");
+
+    if (await OBR.action.isOpen()) {
+      await showPlacementCrosshair();
+    }
+
+    OBR.action.onOpenChange((isOpen) => {
+      const updateCrosshair = isOpen
+        ? showPlacementCrosshair()
+        : removePlacementCrosshair();
+      void updateCrosshair.catch((error: unknown) => {
+        console.warn("Unable to update placement crosshair", error);
+      });
+    });
+
+    OBR.scene.onReadyChange((ready) => {
+      if (ready) {
+        void OBR.action.isOpen().then((isOpen) => {
+          if (isOpen) {
+            return showPlacementCrosshair();
+          }
+        });
+      }
+    });
+  })().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(`Unable to initialize the extension: ${message}`, "error");
   });
 });
 
