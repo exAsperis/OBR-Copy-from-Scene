@@ -81,21 +81,27 @@ export function refreshFavorite(
   scene: IndexedScene,
 ): IndexedScene[] {
   const favorites = getFavorites(storage);
+  if (favoriteKey({ name: favoriteName }) !== favoriteKey(scene)) {
+    return favorites;
+  }
   const index = favorites.findIndex(
     (favorite) => favoriteKey(favorite) === favoriteKey({ name: favoriteName }),
   );
   if (index < 0) {
-    return addFavorite(storage, scene);
+    return favorites;
   }
   const updated = [...favorites];
-  updated[index] = structuredClone(scene);
+  updated[index] = {
+    name: favorites[index]!.name,
+    items: structuredClone(scene.items),
+  };
   storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function getPriorScene(storage: Storage): IndexedScene | null {
   const prior = readJson<IndexedScene>(storage, PRIOR_SCENE_KEY);
-  return prior ? { ...prior, name: "Previous active scene" } : null;
+  return prior ? { ...prior, name: "Previous active scene (cached)" } : null;
 }
 
 export function getActiveScene(storage: Storage): IndexedScene | null {

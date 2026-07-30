@@ -253,7 +253,12 @@ function renderShortcuts(): void {
 
   const addSceneButton = (
     scene: IndexedScene,
-    options: { removable?: boolean; refreshFavorite?: boolean } = {},
+    options: {
+      activeRefresh?: boolean;
+      disabled?: boolean;
+      removable?: boolean;
+      refreshFavorite?: boolean;
+    } = {},
   ): void => {
     const row = document.createElement("div");
     row.className = `scene-shortcut-row${options.removable ? " favorite-row" : ""}`;
@@ -261,9 +266,12 @@ function renderShortcuts(): void {
     button.type = "button";
     button.className = "scene-shortcut";
     button.textContent = scene.name;
+    button.disabled = options.disabled ?? false;
     button.addEventListener("click", () => {
       if (options.refreshFavorite) {
         void inspectScene(scene.name, scene.name);
+      } else if (options.activeRefresh) {
+        void refreshActiveSceneIndex();
       } else {
         renderScene(scene, "cached");
       }
@@ -289,14 +297,16 @@ function renderShortcuts(): void {
     addSceneButton(scene, { removable: true, refreshFavorite: true });
   }
   addSceneButton(
-    prior ?? { name: "Previous active scene", items: [] },
+    prior ?? { name: "Previous active scene (cached)", items: [] },
+    { disabled: !prior },
   );
-  const previousButton = shortcuts.lastElementChild?.querySelector("button");
-  if (!prior && previousButton instanceof HTMLButtonElement) {
-    previousButton.disabled = true;
-  }
   if (active) {
-    addSceneButton(active);
+    addSceneButton(active, { activeRefresh: true });
+  } else if (activeSceneId) {
+    addSceneButton(
+      { name: "Active scene", items: [] },
+      { activeRefresh: true },
+    );
   }
 
   pickButton = document.createElement("button");
@@ -327,6 +337,24 @@ async function syncActiveSceneHistory(): Promise<void> {
     scene: { name: "Active scene", items },
   });
   renderShortcuts();
+}
+
+async function refreshActiveSceneIndex(): Promise<void> {
+  if (!(await OBR.scene.isReady())) {
+    return;
+  }
+  if (!activeSceneId) {
+    await syncActiveSceneHistory();
+  }
+  if (!activeSceneId) {
+    return;
+  }
+
+  const items = await OBR.scene.items.getItems();
+  const scene: IndexedScene = { name: "Active scene", items };
+  trackActiveScene(localStorage, { id: activeSceneId, scene });
+  renderShortcuts();
+  renderScene(scene, "cached");
 }
 
 function createThumbnail(item: Item): HTMLElement {

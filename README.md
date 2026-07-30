@@ -22,8 +22,10 @@ short message explaining that the extension has no player-facing functions.
 
 Up to eight scenes can be explicitly saved as persistent favorites and removed
 individually. The extension also assigns a private metadata ID to active scenes
-so it can retain clickable snapshots labeled **Previous active scene** and
-**Active scene**. Layer expansion state is saved in GM player metadata under
+so it can retain a clickable **Previous active scene (cached)** snapshot.
+**Active scene** fetches a fresh item index whenever it is clicked. Favorite
+buttons reopen the native picker with their name prefilled; only selecting the
+same named scene refreshes that favorite. Layer expansion state is saved in GM player metadata under
 `com.ex-asperis.copy-from-scene`.
 
 The extension also snapshots the active scene's sorted item IDs before and after

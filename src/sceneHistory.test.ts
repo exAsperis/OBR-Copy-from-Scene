@@ -35,7 +35,10 @@ describe("favorite scenes", () => {
     removeFavorite(storage, scene("One", "1"));
     expect(getFavorites(storage).map((item) => item.name)).toEqual(["Two"]);
     refreshFavorite(storage, "Two", scene("Two refreshed", "22"));
-    expect(getFavorites(storage)[0]?.name).toBe("Two refreshed");
+    expect(getFavorites(storage)[0]?.name).toBe("Two");
+    expect(getFavorites(storage)[0]?.items[0]?.id).toBe("2");
+    refreshFavorite(storage, "Two", scene(" two ", "22"));
+    expect(getFavorites(storage)[0]?.name).toBe("Two");
     expect(getFavorites(storage)[0]?.items[0]?.id).toBe("22");
   });
 
@@ -55,7 +58,7 @@ describe("active scene tracking", () => {
     expect(getActiveScene(storage)?.name).toBe("Active scene");
     expect(getPriorScene(storage)).toBeNull();
     trackActiveScene(storage, { id: "b", scene: scene("Active scene", "2") });
-    expect(getPriorScene(storage)?.name).toBe("Previous active scene");
+    expect(getPriorScene(storage)?.name).toBe("Previous active scene (cached)");
     expect(getPriorScene(storage)?.items[0]?.id).toBe("1");
   });
 });
