@@ -20,12 +20,10 @@ The scene picker and placement controls are available only to GMs. Owlbear
 Rodeo's manifest format cannot hide an action by player role, so players see a
 short message explaining that the extension has no player-facing functions.
 
-The last three scenes selected through the native picker are stored in the
-browser and shown as shortcuts. The extension also assigns a private metadata
-ID to active scenes so it can detect scene changes and retain a snapshot of the
-prior active scene. Because Owlbear does not expose the built-in active scene
-name, its name is resolved from indexed scene fingerprints and then stored in
-extension metadata.
+Up to eight scenes can be explicitly saved as persistent favorites and removed
+individually. The extension also assigns a private metadata ID to active scenes
+so it can retain clickable snapshots labeled **Previous active scene** and
+**Active scene**.
 
 The extension also snapshots the active scene's sorted item IDs before and after
 the picker. An unchanged result is strong evidence that the picker did not

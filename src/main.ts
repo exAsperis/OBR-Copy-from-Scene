@@ -16,10 +16,13 @@ import {
   type SceneSnapshot,
 } from "./inspector";
 import {
+  addFavorite,
+  getActiveScene,
+  getFavorites,
   getPriorScene,
-  getRecentScenes,
-  findIndexedSceneName,
-  rememberScene,
+  isFavorite,
+  MAX_FAVORITES,
+  removeFavorite,
   trackActiveScene,
   type IndexedScene,
 } from "./sceneHistory";
@@ -28,7 +31,6 @@ type Verification = "unchanged" | "changed" | "unavailable" | "cached";
 
 const CROSSHAIR_ID = "com.exasperis.obr-extension-test/placement-crosshair";
 const SCENE_ID_METADATA = "com.exasperis.obr-extension-test/scene-id";
-const SCENE_NAME_METADATA = "com.exasperis.obr-extension-test/scene-name";
 const CROSSHAIR_SHADER = `
 uniform vec2 size;
 uniform mat3 view;
@@ -86,7 +88,6 @@ const results = document.querySelector<HTMLElement>("#results")!;
 const shortcuts = document.querySelector<HTMLElement>("#scene-shortcuts")!;
 let pickButton: HTMLButtonElement | null = null;
 let activeSceneId: string | null = null;
-let activeSceneName = "Previous scene (name unavailable)";
 
 function setBusy(busy: boolean): void {
   if (pickButton) {
@@ -180,23 +181,43 @@ async function createPlacementCopy(item: Item, position: { x: number; y: number 
 
 function renderShortcuts(): void {
   shortcuts.replaceChildren();
-  const recent = getRecentScenes(localStorage);
+  const favorites = getFavorites(localStorage);
   const prior = getPriorScene(localStorage);
+  const active = getActiveScene(localStorage);
 
-  const addSceneButton = (scene: IndexedScene): void => {
+  const addSceneButton = (scene: IndexedScene, removable = false): void => {
+    const row = document.createElement("div");
+    row.className = "scene-shortcut-row";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "scene-shortcut";
     button.textContent = scene.name;
     button.addEventListener("click", () => renderScene(scene, "cached"));
-    shortcuts.append(button);
+    row.append(button);
+
+    if (removable) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "remove-favorite";
+      removeButton.textContent = "Remove";
+      removeButton.setAttribute("aria-label", `Remove ${scene.name} from favorites`);
+      removeButton.addEventListener("click", () => {
+        removeFavorite(localStorage, scene);
+        renderShortcuts();
+      });
+      row.append(removeButton);
+    }
+    shortcuts.append(row);
   };
 
-  for (const scene of recent) {
-    addSceneButton(scene);
+  for (const scene of favorites) {
+    addSceneButton(scene, true);
   }
   if (prior) {
     addSceneButton(prior);
+  }
+  if (active) {
+    addSceneButton(active);
   }
 
   pickButton = document.createElement("button");
@@ -222,18 +243,9 @@ async function syncActiveSceneHistory(): Promise<void> {
   }
 
   const items = await OBR.scene.items.getItems();
-  const storedName = metadata[SCENE_NAME_METADATA];
-  const indexedName = findIndexedSceneName(localStorage, items);
-  activeSceneName =
-    typeof storedName === "string"
-      ? storedName
-      : indexedName ?? "Previous scene (name unavailable)";
-  if (typeof storedName !== "string" && indexedName) {
-    await OBR.scene.setMetadata({ [SCENE_NAME_METADATA]: indexedName });
-  }
   trackActiveScene(localStorage, {
     id: activeSceneId,
-    scene: { name: activeSceneName, items },
+    scene: { name: "Active scene", items },
   });
   renderShortcuts();
 }
@@ -325,12 +337,28 @@ function renderScene(scene: IndexedScene, verification: Verification): void {
 
   const summary = document.createElement("header");
   summary.className = "scene-summary";
+  const headingGroup = document.createElement("div");
+  headingGroup.className = "scene-heading";
   const heading = document.createElement("h2");
   heading.textContent = scene.name;
+  headingGroup.append(heading);
+  const favorites = getFavorites(localStorage);
+  if (!isFavorite(localStorage, scene) && favorites.length < MAX_FAVORITES) {
+    const saveFavorite = document.createElement("button");
+    saveFavorite.type = "button";
+    saveFavorite.className = "save-favorite";
+    saveFavorite.textContent = "Save this scene to favorites";
+    saveFavorite.addEventListener("click", () => {
+      addFavorite(localStorage, scene);
+      renderShortcuts();
+      renderScene(scene, verification);
+    });
+    headingGroup.append(saveFavorite);
+  }
   const count = document.createElement("span");
   count.className = "count";
   count.textContent = `${characters.length} character${characters.length === 1 ? "" : "s"}`;
-  summary.append(heading, count);
+  summary.append(headingGroup, count);
   results.append(summary);
 
   if (verification === "cached") {
@@ -390,13 +418,6 @@ async function inspectScene(): Promise<void> {
       name: scene.name,
       items: scene.items,
     };
-    try {
-      rememberScene(localStorage, indexedScene);
-    } catch (error) {
-      console.warn("Unable to persist indexed scene", error);
-    }
-    renderShortcuts();
-
     const after = await takeCurrentSceneSnapshot();
     const verification: Verification =
       before.ready && after.ready
@@ -458,7 +479,6 @@ OBR.onReady(() => {
         );
       } else {
         activeSceneId = null;
-        activeSceneName = "Previous scene (name unavailable)";
       }
     });
 
@@ -468,7 +488,7 @@ OBR.onReady(() => {
       }
       trackActiveScene(localStorage, {
         id: activeSceneId,
-        scene: { name: activeSceneName, items },
+        scene: { name: "Active scene", items },
       });
     });
   })().catch((error: unknown) => {

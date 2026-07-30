@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "@owlbear-rodeo/sdk";
 import {
+  addFavorite,
+  getActiveScene,
+  getFavorites,
   getPriorScene,
-  getRecentScenes,
-  findIndexedSceneName,
-  rememberScene,
+  isFavorite,
+  removeFavorite,
   trackActiveScene,
 } from "./sceneHistory";
 
@@ -22,29 +24,34 @@ function scene(name: string, id: string) {
   return { name, items: [{ id } as Item] };
 }
 
-describe("recent scene history", () => {
-  it("keeps the three most recently indexed scenes", () => {
+describe("favorite scenes", () => {
+  it("adds, detects, and removes explicit favorites", () => {
     const storage = new MemoryStorage();
-    rememberScene(storage, scene("One", "1"));
-    rememberScene(storage, scene("Two", "2"));
-    rememberScene(storage, scene("Three", "3"));
-    rememberScene(storage, scene("Four", "4"));
-    expect(getRecentScenes(storage).map((item) => item.name)).toEqual([
-      "Four",
-      "Three",
-      "Two",
-    ]);
-    expect(findIndexedSceneName(storage, [{ id: "3" } as Item])).toBe("Three");
+    addFavorite(storage, scene("One", "1"));
+    addFavorite(storage, scene("Two", "2"));
+    expect(getFavorites(storage).map((item) => item.name)).toEqual(["One", "Two"]);
+    expect(isFavorite(storage, scene("One", "1"))).toBe(true);
+    removeFavorite(storage, scene("One", "1"));
+    expect(getFavorites(storage).map((item) => item.name)).toEqual(["Two"]);
+  });
+
+  it("caps favorites at eight scenes", () => {
+    const storage = new MemoryStorage();
+    for (let index = 0; index < 10; index += 1) {
+      addFavorite(storage, scene(`Scene ${index}`, String(index)));
+    }
+    expect(getFavorites(storage)).toHaveLength(8);
   });
 });
 
 describe("active scene tracking", () => {
   it("promotes the previous snapshot when the active scene ID changes", () => {
     const storage = new MemoryStorage();
-    trackActiveScene(storage, { id: "a", scene: scene("Market Square", "1") });
+    trackActiveScene(storage, { id: "a", scene: scene("Anything", "1") });
+    expect(getActiveScene(storage)?.name).toBe("Active scene");
     expect(getPriorScene(storage)).toBeNull();
     trackActiveScene(storage, { id: "b", scene: scene("Active scene", "2") });
-    expect(getPriorScene(storage)?.name).toBe("Market Square");
+    expect(getPriorScene(storage)?.name).toBe("Previous active scene");
     expect(getPriorScene(storage)?.items[0]?.id).toBe("1");
   });
 });

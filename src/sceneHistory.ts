@@ -10,9 +10,10 @@ export interface ActiveSceneSnapshot {
   scene: IndexedScene;
 }
 
-const RECENT_SCENES_KEY = "com.exasperis.obr-extension-test/recent-scenes";
+const FAVORITE_SCENES_KEY = "com.exasperis.obr-extension-test/favorite-scenes";
 const ACTIVE_SCENE_KEY = "com.exasperis.obr-extension-test/active-scene";
 const PRIOR_SCENE_KEY = "com.exasperis.obr-extension-test/prior-scene";
+export const MAX_FAVORITES = 8;
 
 function readJson<T>(storage: Storage, key: string): T | null {
   const value = storage.getItem(key);
@@ -28,49 +29,51 @@ function readJson<T>(storage: Storage, key: string): T | null {
   }
 }
 
-export function getRecentScenes(storage: Storage): IndexedScene[] {
-  return readJson<IndexedScene[]>(storage, RECENT_SCENES_KEY) ?? [];
+export function getFavorites(storage: Storage): IndexedScene[] {
+  return readJson<IndexedScene[]>(storage, FAVORITE_SCENES_KEY) ?? [];
 }
 
 function sceneSignature(scene: Pick<IndexedScene, "items">): string {
   return scene.items.map((item) => item.id).sort().join("|");
 }
 
-export function findIndexedSceneName(
-  storage: Storage,
-  items: Item[],
-): string | null {
-  const signature = sceneSignature({ items });
-  return (
-    getRecentScenes(storage).find(
-      (scene) => sceneSignature(scene) === signature,
-    )?.name ?? null
+export function isFavorite(storage: Storage, scene: IndexedScene): boolean {
+  const signature = sceneSignature(scene);
+  return getFavorites(storage).some(
+    (favorite) => sceneSignature(favorite) === signature,
   );
 }
 
-export function rememberScene(storage: Storage, scene: IndexedScene): IndexedScene[] {
+export function addFavorite(storage: Storage, scene: IndexedScene): IndexedScene[] {
+  const favorites = getFavorites(storage);
+  if (isFavorite(storage, scene) || favorites.length >= MAX_FAVORITES) {
+    return favorites;
+  }
+  const updated = [...favorites, structuredClone(scene)];
+  storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function removeFavorite(
+  storage: Storage,
+  scene: IndexedScene,
+): IndexedScene[] {
   const signature = sceneSignature(scene);
-  const recent = getRecentScenes(storage).filter((candidate) => {
-    const candidateSignature = sceneSignature(candidate);
-    return candidate.name !== scene.name || candidateSignature !== signature;
-  });
-  const updated = [structuredClone(scene), ...recent].slice(0, 3);
-  storage.setItem(RECENT_SCENES_KEY, JSON.stringify(updated));
+  const updated = getFavorites(storage).filter(
+    (favorite) => sceneSignature(favorite) !== signature,
+  );
+  storage.setItem(FAVORITE_SCENES_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function getPriorScene(storage: Storage): IndexedScene | null {
   const prior = readJson<IndexedScene>(storage, PRIOR_SCENE_KEY);
-  if (!prior || prior.name !== "Prior active scene") {
-    return prior;
-  }
+  return prior ? { ...prior, name: "Previous active scene" } : null;
+}
 
-  return {
-    ...prior,
-    name:
-      findIndexedSceneName(storage, prior.items) ??
-      "Previous scene (name unavailable)",
-  };
+export function getActiveScene(storage: Storage): IndexedScene | null {
+  const active = readJson<ActiveSceneSnapshot>(storage, ACTIVE_SCENE_KEY);
+  return active ? { ...active.scene, name: "Active scene" } : null;
 }
 
 export function trackActiveScene(
