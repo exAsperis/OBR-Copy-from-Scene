@@ -125,7 +125,7 @@ describe("copyItemForPlacement", () => {
       id: "new-id",
       userId: "current-user",
       timestamp: "2026-07-29T12:00:00.000Z",
-    });
+    }, false);
 
     expect(copy.id).toBe("new-id");
     expect(copy.position).toEqual({ x: 40, y: 60 });
@@ -135,6 +135,7 @@ describe("copyItemForPlacement", () => {
     expect(copy.createdUserId).toBe("current-user");
     expect(copy.lastModifiedUserId).toBe("current-user");
     expect(copy.lastModified).toBe("2026-07-29T12:00:00.000Z");
+    expect(copy.visible).toBe(false);
     expect(source.id).toBe("image-1");
   });
 });

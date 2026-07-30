@@ -72,6 +72,7 @@ export function copyItemForPlacement(
   item: Item,
   position: Vector2,
   identity: { id: string; userId: string; timestamp: string },
+  visible = item.visible,
 ): Item {
   const copy = structuredClone(item) as {
     -readonly [Key in keyof Item]: Item[Key];
@@ -82,6 +83,7 @@ export function copyItemForPlacement(
   copy.lastModifiedUserId = identity.userId;
   copy.zIndex = Date.parse(identity.timestamp);
   copy.position = position;
+  copy.visible = visible;
   copy.attachedTo = undefined;
   copy.disableAutoZIndex = false;
   return copy as Item;

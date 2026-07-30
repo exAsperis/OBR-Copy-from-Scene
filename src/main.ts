@@ -77,19 +77,17 @@ half4 main(float2 coord) {
 
   float horizontalArm =
     (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.y)) *
-    smoothstep(7.0, 8.0, distanceFromCenter.x) *
-    (1.0 - smoothstep(19.0, 20.0, distanceFromCenter.x));
+    smoothstep(9.0, 10.0, distanceFromCenter.x) *
+    (1.0 - smoothstep(79.0, 80.0, distanceFromCenter.x));
   float verticalArm =
     (1.0 - smoothstep(1.0, 2.0, distanceFromCenter.x)) *
-    smoothstep(7.0, 8.0, distanceFromCenter.y) *
-    (1.0 - smoothstep(19.0, 20.0, distanceFromCenter.y));
+    smoothstep(9.0, 10.0, distanceFromCenter.y) *
+    (1.0 - smoothstep(79.0, 80.0, distanceFromCenter.y));
 
   float squareDistance = max(distanceFromCenter.x, distanceFromCenter.y);
-  float squareOutline =
-    (1.0 - smoothstep(7.0, 8.0, squareDistance)) *
-    smoothstep(5.0, 6.0, squareDistance);
+  float centerDot = 1.0 - smoothstep(2.5, 3.5, squareDistance);
 
-  float alpha = max(squareOutline, max(horizontalArm, verticalArm));
+  float alpha = max(centerDot, max(horizontalArm, verticalArm));
   float finalAlpha = alpha * 0.95;
   vec3 color = vec3(0.80, 0.63, 0.96);
   return half4(color * finalAlpha, finalAlpha);
@@ -175,7 +173,11 @@ async function showPlacementCrosshair(): Promise<void> {
   await OBR.scene.local.addItems([crosshair]);
 }
 
-async function createPlacementCopy(item: Item, position: { x: number; y: number }): Promise<Item> {
+async function createPlacementCopy(
+  item: Item,
+  position: { x: number; y: number },
+  visible: boolean,
+): Promise<Item> {
   if (item.type === "IMAGE") {
     const source = item as Image;
     const builder = buildImage(
@@ -186,7 +188,7 @@ async function createPlacementCopy(item: Item, position: { x: number; y: number 
       .position(position)
       .rotation(source.rotation)
       .scale(structuredClone(source.scale))
-      .visible(source.visible)
+      .visible(visible)
       .locked(source.locked)
       .metadata(structuredClone(source.metadata))
       .layer(source.layer)
@@ -213,7 +215,7 @@ async function createPlacementCopy(item: Item, position: { x: number; y: number 
     id: crypto.randomUUID(),
     userId: await OBR.player.getId(),
     timestamp,
-  });
+  }, visible);
 }
 
 async function loadSectionState(): Promise<void> {
@@ -410,13 +412,35 @@ function createItemCard(item: Item): HTMLElement {
   metadataToggle.setAttribute("aria-expanded", "false");
   body.append(title, name, metadataToggle);
 
-  const placeButton = document.createElement("button");
-  placeButton.className = "place-button";
-  placeButton.type = "button";
-  placeButton.textContent = "Place";
-  placeButton.addEventListener("click", async () => {
-    placeButton.disabled = true;
-    placeButton.textContent = "Placing…";
+  const placement = document.createElement("div");
+  placement.className = "placement-controls";
+  const placementHeading = document.createElement("span");
+  placementHeading.className = "placement-heading";
+  placementHeading.textContent = "Place";
+  const placementButtons = document.createElement("div");
+  placementButtons.className = "placement-buttons";
+  placement.append(placementHeading, placementButtons);
+
+  const createVisibilityButton = (
+    visible: boolean,
+    label: string,
+    path: string,
+  ): HTMLButtonElement => {
+    const button = document.createElement("button");
+    button.className = "visibility-button";
+    button.type = "button";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="${path}"></path>
+      </svg>
+    `;
+    button.addEventListener("click", async () => {
+      const buttons = placementButtons.querySelectorAll<HTMLButtonElement>("button");
+      buttons.forEach((candidate) => {
+        candidate.disabled = true;
+      });
     try {
       if (!(await OBR.scene.isReady())) {
         throw new Error("Open a scene before placing an item.");
@@ -429,24 +453,45 @@ function createItemCard(item: Item): HTMLElement {
         x: width / 2,
         y: height / 2,
       });
-      const copy = await createPlacementCopy(item, position);
+      const copy = await createPlacementCopy(item, position, visible);
       await OBR.scene.items.addItems([copy]);
-      setStatus(`Placed “${getItemText(item)}” in the center of the current view.`, "success");
-      placeButton.textContent = "Placed";
+      setStatus(
+        `Placed “${item.name || getItemText(item)}” ${visible ? "visible" : "hidden"} in the center of the current view.`,
+        "success",
+      );
+      button.classList.add("placed");
       window.setTimeout(() => {
-        placeButton.disabled = false;
-        placeButton.textContent = "Place";
+        buttons.forEach((candidate) => {
+          candidate.disabled = false;
+        });
+        button.classList.remove("placed");
       }, 900);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(`Unable to place item: ${message}`, "error");
-      placeButton.disabled = false;
-      placeButton.textContent = "Place";
+      buttons.forEach((candidate) => {
+        candidate.disabled = false;
+      });
     }
-  });
+    });
+    return button;
+  };
+
+  placementButtons.append(
+    createVisibilityButton(
+      true,
+      "Place visible",
+      "M12 4C7 4 2.73 7.11 1 11.5 2.73 15.89 7 19 12 19s9.27-3.11 11-7.5C21.27 7.11 17 4 12 4m0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5m0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3",
+    ),
+    createVisibilityButton(
+      false,
+      "Place hidden",
+      "M12 6.5c2.76 0 5 2.24 5 5 0 .51-.1 1-.24 1.46l3.06 3.06c1.39-1.23 2.49-2.77 3.18-4.53C21.27 7.11 17 4 12 4c-1.27 0-2.49.2-3.64.57l2.17 2.17c.47-.14.96-.24 1.47-.24M2.71 3.16c-.39.39-.39 1.02 0 1.41l1.97 1.97C3.06 7.83 1.77 9.53 1 11.5 2.73 15.89 7 19 12 19c1.52 0 2.97-.3 4.31-.82l2.72 2.72c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L4.13 3.16c-.39-.39-1.03-.39-1.42 0M12 16.5c-2.76 0-5-2.24-5-5 0-.77.18-1.5.49-2.14l1.57 1.57c-.03.18-.06.37-.06.57 0 1.66 1.34 3 3 3 .2 0 .38-.03.57-.07L14.14 16c-.65.32-1.37.5-2.14.5m2.97-5.33c-.15-1.4-1.25-2.49-2.64-2.64z",
+    ),
+  );
 
   card.append(body);
-  card.append(placeButton);
+  card.append(placement);
 
   const json = document.createElement("pre");
   json.className = "item-json";
@@ -460,7 +505,11 @@ function createItemCard(item: Item): HTMLElement {
   return card;
 }
 
-function renderScene(scene: IndexedScene, verification: Verification): void {
+function renderScene(
+  scene: IndexedScene,
+  verification: Verification,
+  allowFavorite = false,
+): void {
   results.replaceChildren();
 
   const summary = document.createElement("header");
@@ -471,7 +520,11 @@ function renderScene(scene: IndexedScene, verification: Verification): void {
   heading.textContent = scene.name;
   headingGroup.append(heading);
   const favorites = getFavorites(localStorage);
-  if (!isFavorite(localStorage, scene) && favorites.length < MAX_FAVORITES) {
+  if (
+    allowFavorite &&
+    !isFavorite(localStorage, scene) &&
+    favorites.length < MAX_FAVORITES
+  ) {
     const saveFavorite = document.createElement("button");
     saveFavorite.type = "button";
     saveFavorite.className = "save-favorite";
@@ -479,7 +532,7 @@ function renderScene(scene: IndexedScene, verification: Verification): void {
     saveFavorite.addEventListener("click", () => {
       addFavorite(localStorage, scene);
       renderShortcuts();
-      renderScene(scene, verification);
+      renderScene(scene, verification, false);
     });
     headingGroup.append(saveFavorite);
   }
@@ -610,7 +663,7 @@ async function inspectScene(
           ? "unchanged"
           : "changed"
         : "unavailable";
-    renderScene(indexedScene, verification);
+    renderScene(indexedScene, verification, true);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`Unable to inspect the scene: ${message}`, "error");

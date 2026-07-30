@@ -388,25 +388,58 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-.place-button {
-  min-width: 62px;
-  padding: 7px 10px;
+.placement-controls {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+
+.placement-heading {
+  color: #a99eb1;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.placement-buttons {
+  display: flex;
+  gap: 3px;
+}
+
+.visibility-button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  padding: 4px;
   border: 1px solid #8051bd;
-  border-radius: 7px;
+  border-radius: 6px;
   color: #f6f1ff;
   background: #56307d;
-  font-size: 0.8rem;
-  font-weight: 700;
   cursor: pointer;
 }
 
-.place-button:hover:not(:disabled) {
+.visibility-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.visibility-button:hover:not(:disabled) {
   background: #684093;
 }
 
-.place-button:disabled {
+.visibility-button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.visibility-button.placed {
+  border-color: #65b68c;
+  color: #c8f2dc;
+  background: #286346;
 }
 
 @media (max-width: 520px) {
