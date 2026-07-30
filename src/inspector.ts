@@ -12,7 +12,7 @@ export interface SceneSnapshot {
   itemIds: string[];
 }
 
-export function getCharacterItems(scene: SceneDownload): Item[] {
+export function getCharacterItems(scene: Pick<SceneDownload, "items">): Item[] {
   return scene.items.filter((item) => item.layer === "CHARACTER");
 }
 
@@ -71,12 +71,16 @@ export function getItemText(item: Item): string {
 export function copyItemForPlacement(
   item: Item,
   position: Vector2,
-  id: string = crypto.randomUUID(),
+  identity: { id: string; userId: string; timestamp: string },
 ): Item {
   const copy = structuredClone(item) as {
     -readonly [Key in keyof Item]: Item[Key];
   };
-  copy.id = id;
+  copy.id = identity.id;
+  copy.createdUserId = identity.userId;
+  copy.lastModified = identity.timestamp;
+  copy.lastModifiedUserId = identity.userId;
+  copy.zIndex = Date.parse(identity.timestamp);
   copy.position = position;
   copy.attachedTo = undefined;
   copy.disableAutoZIndex = false;

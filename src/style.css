@@ -71,6 +71,49 @@ h1 {
   line-height: 1.5;
 }
 
+.scene-shortcuts {
+  display: grid;
+  gap: 6px;
+}
+
+.scene-shortcut {
+  width: 100%;
+  padding: 9px 11px;
+  overflow: hidden;
+  border: 1px solid #51475e;
+  border-radius: 8px;
+  color: #ddd4e5;
+  background: #241e2c;
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.scene-shortcut:hover:not(:disabled) {
+  border-color: #8051bd;
+  background: #30253b;
+}
+
+.scene-shortcut-pick {
+  color: white;
+  background: #7440bc;
+  font-weight: 700;
+  text-align: center;
+}
+
+.scene-shortcut-pick:hover:not(:disabled) {
+  background: #8550cc;
+}
+
+.scene-shortcut:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+/* Retained for compatibility with older cached markup. */
 #pick-scene {
   flex: 0 0 auto;
   min-width: 118px;

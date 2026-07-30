@@ -1,6 +1,6 @@
 {
   "name": "Scene Inspector",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "manifest_version": 1,
   "description": "Inspect character items and metadata in another saved scene without opening it.",
   "author": "exAsperis",

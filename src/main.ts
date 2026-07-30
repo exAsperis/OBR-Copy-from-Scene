@@ -1,5 +1,7 @@
 import OBR, {
   buildEffect,
+  buildImage,
+  type Image,
   type Item,
   type SceneDownload,
 } from "@owlbear-rodeo/sdk";
@@ -13,10 +15,18 @@ import {
   stableItemIds,
   type SceneSnapshot,
 } from "./inspector";
+import {
+  getPriorScene,
+  getRecentScenes,
+  rememberScene,
+  trackActiveScene,
+  type IndexedScene,
+} from "./sceneHistory";
 
-type Verification = "unchanged" | "changed" | "unavailable";
+type Verification = "unchanged" | "changed" | "unavailable" | "cached";
 
 const CROSSHAIR_ID = "com.exasperis.obr-extension-test/placement-crosshair";
+const SCENE_ID_METADATA = "com.exasperis.obr-extension-test/scene-id";
 const CROSSHAIR_SHADER = `
 uniform vec2 size;
 uniform mat3 view;
@@ -56,14 +66,11 @@ app.innerHTML = `
   <section class="shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">Owlbear Rodeo experiment</p>
         <h1>Scene Inspector</h1>
-        <p class="intro">Inspect character items from another saved scene without opening it in the room.</p>
+        <p class="intro">Copy character items from any saved scene to the active scene.</p>
       </div>
-      <button id="pick-scene" type="button" disabled>
-        <span class="button-label">Connecting…</span>
-      </button>
     </header>
+    <nav id="scene-shortcuts" class="scene-shortcuts" aria-label="Indexed scenes"></nav>
     <div id="status" class="status status-neutral" role="status">
       Waiting for the Owlbear Rodeo SDK.
     </div>
@@ -76,14 +83,17 @@ app.innerHTML = `
   </section>
 `;
 
-const pickButton = document.querySelector<HTMLButtonElement>("#pick-scene")!;
-const buttonLabel = pickButton.querySelector<HTMLElement>(".button-label")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const results = document.querySelector<HTMLElement>("#results")!;
+const shortcuts = document.querySelector<HTMLElement>("#scene-shortcuts")!;
+let pickButton: HTMLButtonElement | null = null;
+let activeSceneId: string | null = null;
 
 function setBusy(busy: boolean): void {
-  pickButton.disabled = busy;
-  buttonLabel.textContent = busy ? "Opening picker…" : "Pick a scene";
+  if (pickButton) {
+    pickButton.disabled = busy;
+    pickButton.textContent = busy ? "Opening picker…" : "Pick another scene";
+  }
 }
 
 function setStatus(message: string, kind: "neutral" | "success" | "warning" | "error"): void {
@@ -125,6 +135,98 @@ async function showPlacementCrosshair(): Promise<void> {
     .zIndex(1_000_000)
     .build();
   await OBR.scene.local.addItems([crosshair]);
+}
+
+async function createPlacementCopy(item: Item, position: { x: number; y: number }): Promise<Item> {
+  if (item.type === "IMAGE") {
+    const source = item as Image;
+    const builder = buildImage(
+      structuredClone(source.image),
+      structuredClone(source.grid),
+    )
+      .name(source.name)
+      .position(position)
+      .rotation(source.rotation)
+      .scale(structuredClone(source.scale))
+      .visible(source.visible)
+      .locked(source.locked)
+      .metadata(structuredClone(source.metadata))
+      .layer(source.layer)
+      .text(structuredClone(source.text))
+      .textItemType(source.textItemType)
+      .disableAutoZIndex(false);
+
+    if (source.description) {
+      builder.description(source.description);
+    }
+    if (source.disableHit !== undefined) {
+      builder.disableHit(source.disableHit);
+    }
+    if (source.disableAttachmentBehavior) {
+      builder.disableAttachmentBehavior(
+        structuredClone(source.disableAttachmentBehavior),
+      );
+    }
+    return builder.build();
+  }
+
+  const timestamp = new Date().toISOString();
+  return copyItemForPlacement(item, position, {
+    id: crypto.randomUUID(),
+    userId: await OBR.player.getId(),
+    timestamp,
+  });
+}
+
+function renderShortcuts(): void {
+  shortcuts.replaceChildren();
+  const recent = getRecentScenes(localStorage);
+  const prior = getPriorScene(localStorage);
+
+  const addSceneButton = (scene: IndexedScene): void => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scene-shortcut";
+    button.textContent = scene.name;
+    button.addEventListener("click", () => renderScene(scene, "cached"));
+    shortcuts.append(button);
+  };
+
+  for (const scene of recent) {
+    addSceneButton(scene);
+  }
+  if (prior) {
+    addSceneButton(prior);
+  }
+
+  pickButton = document.createElement("button");
+  pickButton.type = "button";
+  pickButton.className = "scene-shortcut scene-shortcut-pick";
+  pickButton.textContent = "Pick another scene";
+  pickButton.addEventListener("click", inspectScene);
+  shortcuts.append(pickButton);
+}
+
+async function syncActiveSceneHistory(): Promise<void> {
+  if (!(await OBR.scene.isReady())) {
+    activeSceneId = null;
+    return;
+  }
+
+  const metadata = await OBR.scene.getMetadata();
+  const existingId = metadata[SCENE_ID_METADATA];
+  activeSceneId =
+    typeof existingId === "string" ? existingId : crypto.randomUUID();
+  if (existingId !== activeSceneId) {
+    await OBR.scene.setMetadata({ [SCENE_ID_METADATA]: activeSceneId });
+  }
+
+  const items = await OBR.scene.items.getItems();
+  trackActiveScene(localStorage, {
+    id: activeSceneId,
+    scene: { name: "Active scene", items },
+  });
+  renderShortcuts();
 }
 
 function createThumbnail(item: Item): HTMLElement {
@@ -187,7 +289,7 @@ function createItemCard(item: Item): HTMLElement {
         x: width / 2,
         y: height / 2,
       });
-      const copy = copyItemForPlacement(item, position);
+      const copy = await createPlacementCopy(item, position);
       await OBR.scene.items.addItems([copy]);
       setStatus(`Placed “${getItemText(item)}” in the center of the current view.`, "success");
       placeButton.textContent = "Placed";
@@ -208,7 +310,7 @@ function createItemCard(item: Item): HTMLElement {
   return card;
 }
 
-function renderScene(scene: SceneDownload, verification: Verification): void {
+function renderScene(scene: IndexedScene, verification: Verification): void {
   const characters = getCharacterItems(scene);
   results.replaceChildren();
 
@@ -222,7 +324,9 @@ function renderScene(scene: SceneDownload, verification: Verification): void {
   summary.append(heading, count);
   results.append(summary);
 
-  if (verification === "unchanged") {
+  if (verification === "cached") {
+    setStatus(`Loaded indexed scene “${scene.name}”.`, "neutral");
+  } else if (verification === "unchanged") {
     setStatus(
       "Active scene unchanged — it remained ready with the same item IDs before and after inspection.",
       "success",
@@ -273,6 +377,17 @@ async function inspectScene(): Promise<void> {
       throw new Error("The scene picker returned no scene data.");
     }
 
+    const indexedScene: IndexedScene = {
+      name: scene.name,
+      items: scene.items,
+    };
+    try {
+      rememberScene(localStorage, indexedScene);
+    } catch (error) {
+      console.warn("Unable to persist indexed scene", error);
+    }
+    renderShortcuts();
+
     const after = await takeCurrentSceneSnapshot();
     const verification: Verification =
       before.ready && after.ready
@@ -280,7 +395,7 @@ async function inspectScene(): Promise<void> {
           ? "unchanged"
           : "changed"
         : "unavailable";
-    renderScene(scene, verification);
+    renderScene(indexedScene, verification);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`Unable to inspect the scene: ${message}`, "error");
@@ -288,8 +403,6 @@ async function inspectScene(): Promise<void> {
     setBusy(false);
   }
 }
-
-pickButton.addEventListener("click", inspectScene);
 
 OBR.onReady(() => {
   void (async () => {
@@ -310,6 +423,7 @@ OBR.onReady(() => {
 
     setBusy(false);
     setStatus("Connected. Pick a saved scene to begin.", "neutral");
+    await syncActiveSceneHistory();
 
     if (await OBR.action.isOpen()) {
       await showPlacementCrosshair();
@@ -326,12 +440,26 @@ OBR.onReady(() => {
 
     OBR.scene.onReadyChange((ready) => {
       if (ready) {
-        void OBR.action.isOpen().then((isOpen) => {
-          if (isOpen) {
-            return showPlacementCrosshair();
-          }
-        });
+        void syncActiveSceneHistory().then(() =>
+          OBR.action.isOpen().then((isOpen) => {
+            if (isOpen) {
+              return showPlacementCrosshair();
+            }
+          }),
+        );
+      } else {
+        activeSceneId = null;
       }
+    });
+
+    OBR.scene.items.onChange((items) => {
+      if (!activeSceneId) {
+        return;
+      }
+      trackActiveScene(localStorage, {
+        id: activeSceneId,
+        scene: { name: "Active scene", items },
+      });
     });
   })().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);

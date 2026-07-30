@@ -121,13 +121,20 @@ describe("copyItemForPlacement", () => {
     source.metadata = { "example.test/data": { hp: 7 } };
     source.attachedTo = "old-parent";
 
-    const copy = copyItemForPlacement(source, { x: 40, y: 60 }, "new-id");
+    const copy = copyItemForPlacement(source, { x: 40, y: 60 }, {
+      id: "new-id",
+      userId: "current-user",
+      timestamp: "2026-07-29T12:00:00.000Z",
+    });
 
     expect(copy.id).toBe("new-id");
     expect(copy.position).toEqual({ x: 40, y: 60 });
     expect(copy.metadata).toEqual(source.metadata);
     expect((copy as Image).image).toEqual(source.image);
     expect(copy.attachedTo).toBeUndefined();
+    expect(copy.createdUserId).toBe("current-user");
+    expect(copy.lastModifiedUserId).toBe("current-user");
+    expect(copy.lastModified).toBe("2026-07-29T12:00:00.000Z");
     expect(source.id).toBe("image-1");
   });
 });
