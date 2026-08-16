@@ -5,11 +5,11 @@
   "description": "Copy items from any saved scene into the active scene.",
   "author": "es Asperis",
   "homepage_url": "https://github.com/exAsperis/OBR-Copy-from-Scene",
-  "icon": "/icon.svg",
+  "icon": "https://copy-from-scene.ex-asperis.com/icon.svg?v=2.1.0",
   "action": {
     "title": "Copy from Scene",
-    "icon": "/icon.svg",
-    "popover": "/",
+    "icon": "https://copy-from-scene.ex-asperis.com/icon.svg?v=2.1.0",
+    "popover": "https://copy-from-scene.ex-asperis.com/?v=2.1.0",
     "width": 380,
     "height": 720
   }
