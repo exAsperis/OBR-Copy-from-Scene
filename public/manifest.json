@@ -3,13 +3,13 @@
   "version": "2.1.0",
   "manifest_version": 1,
   "description": "Copy items from any saved scene into the active scene.",
-  "author": "exAsperis",
-  "homepage_url": "https://github.com/exAsperis/OBR-Extension-Test",
-  "icon": "/OBR-Extension-Test/icon.svg",
+  "author": "es Asperis",
+  "homepage_url": "https://github.com/exAsperis/OBR-Copy-from-Scene",
+  "icon": "/icon.svg",
   "action": {
     "title": "Copy from Scene",
-    "icon": "/OBR-Extension-Test/icon.svg",
-    "popover": "/OBR-Extension-Test/",
+    "icon": "/icon.svg",
+    "popover": "/",
     "width": 380,
     "height": 720
   }

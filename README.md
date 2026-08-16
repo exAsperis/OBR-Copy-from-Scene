@@ -49,8 +49,8 @@ pnpm dev
 
 Vite serves the extension at:
 
-- App: `http://localhost:5173/OBR-Extension-Test/`
-- Manifest: `http://localhost:5173/OBR-Extension-Test/manifest.json`
+- App: `http://localhost:5173/`
+- Manifest: `http://localhost:5173/manifest.json`
 
 Add the manifest URL in Owlbear Rodeo's extension management screen. Owlbear
 Rodeo permits localhost during development.
@@ -63,16 +63,13 @@ pnpm test
 pnpm build
 ```
 
-## GitHub Pages
+## Azure Static Web Apps
 
-Pushes to `main` run the Pages workflow. Once GitHub Pages is configured to use
-**GitHub Actions** as its source, install the extension from:
+Pushes to `main` run the Azure Static Web Apps workflow. Pull requests receive
+Azure preview environments, which are removed when the pull request closes.
 
-`https://exasperis.github.io/OBR-Extension-Test/manifest.json`
-
-The production app is:
-
-`https://exasperis.github.io/OBR-Extension-Test/`
+Install the extension in Owlbear Rodeo with the production Static Web App URL
+followed by `/manifest.json`.
 
 ## Limitations
 
